@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from gmail_auth import gmail_authenticate
 import get_mail
 import patterns_yape
+import patterns_yape_1
 import patterns_bcp
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -41,7 +42,7 @@ def main():
     senders = [
         'notificaciones@notificacionesbcp.com.pe',
         'notificaciones@yape.pe',
-        # 'notificaciones@notificacionesbcp.com.pe',
+        'noreply@yape.pe'
     ]
 
     count = 0
@@ -67,6 +68,23 @@ def main():
                         'remitente_cel': [],
                         'beneficiario_cel': [],
                         'operacion': []
+                    }
+                elif sender == 'noreply@yape.pe':
+                    data = {
+                        'id': [],
+                        'monto_total': [],
+                        'yapero': [],
+                        'numero_asociado': [],
+                        'fecha_hora': [],
+                        'operacion_yape': [],
+                        'empresa': [],
+                        'servicio': [],
+                        'codigo_usuario': [],
+                        'titular_servicio': [],
+                        'nro_documento': [],
+                        # 'monto_pagado': [],
+                        # 'recarga_efectiva': [],
+                        # 'ruc': []
                     }
                 elif sender == 'notificaciones@notificacionesbcp.com.pe':
                     data = {
@@ -102,7 +120,7 @@ def main():
                     print("Error: remitente no soportado")
                     continue
 
-                print(f"Cabecera de los datos para {sender}: {data}")
+                print(f"\nCabecera de los datos para {sender}: {data}")
                 print("Extrayendo datos...\n")
 
                 nro_text = 0
@@ -116,6 +134,8 @@ def main():
 
                     if sender == 'notificaciones@yape.pe':
                         json = patterns_yape.dataExtract(txt, id)
+                    elif sender == 'noreply@yape.pe':
+                        json = patterns_yape_1.dataExtract(txt, id) 
                     elif sender == 'notificaciones@notificacionesbcp.com.pe':
                         json = patterns_bcp.dataExtract(txt, id)
                     else:
@@ -136,6 +156,8 @@ def main():
 
                 if sender == 'notificaciones@yape.pe':
                     file_path = './app/data/yape_details.xlsx'
+                elif sender == 'noreply@yape.pe':
+                    file_path = './app/data/yape_1_details.xlsx'
                 elif sender == 'notificaciones@notificacionesbcp.com.pe':
                     file_path = './app/data/bcp_details.xlsx'
 
@@ -150,8 +172,6 @@ def main():
             else:
                 print(f"No se encontraron correos nuevos para {sender}.\n")
     
-   
-
         print("************* END *************")
     else:
         print("Error al autenticarse con Gmail")

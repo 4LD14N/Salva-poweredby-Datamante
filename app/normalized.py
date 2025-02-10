@@ -1,6 +1,11 @@
 import re
 import pandas as pd
 
+# Ruta de los archivos de entrada
+BCP_FILE = './app/data/bcp_details.xlsx'
+YAPE_FILE = './app/data/yape_details.xlsx'
+YAPE_1_FILE = './app/data/yape_1_details.xlsx'
+
 def normalize_fecha_hora(fecha_hora):
     
     if not isinstance(fecha_hora, str):
@@ -8,10 +13,14 @@ def normalize_fecha_hora(fecha_hora):
     
     # def convertir_fecha(fecha):
     meses = {
-            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
-        }
+        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+        'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
+        'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+        'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12', 
+        'set': '09'
+    }
 
     def convert_to_24_hour(hora_str):
             if 'AM' in hora_str or 'PM' in hora_str:
@@ -34,101 +43,68 @@ def normalize_fecha_hora(fecha_hora):
             return hora_str  # Si ya está en formato de 24 horas, simplemente devolverlo
 
     regex = [
-            r'(\d{2})\/(\d{2})\/(\d{4})\s-\s(\d{1,2}:\d{2})(:\d{2})?\s([APap]\.?[Mm]\.?)',  #10/12/2023 - 8:56 PM
-            r'(\d{4})-(\d{2})-(\d{2})(?:\s(\d{2}:\d{2}:\d{2}))?',  #2023-01-26 10:13:49
-            r'(\d{1,2})/(\d{1,2})/(\d{4})(?:\s-?\s?(\d{2}:\d{2}:\d{2}))?', #28/2/2024 - 21:56:10
-            r'(\d{1,2}) de (\w+) de (\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?([APap]\.?[Mm]\.?)?)?', #01 de junio de 2024 - 01:54 PM
-            r'\w+,\s?(\d{1,2})\s?(\w+)\s?(\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?(AM|PM|[Aa]\.?\s?[Mm]\.?|[Pp]\.?\s?[Mm]\.?)?)?', #Domingo, 01 Octubre 2023 - 12:20 P. M.
-            r'(\d{1,2}) (\w+) (\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?([APap]\.?\s?[Mm]\.?)?)?' #25 agosto 2024 - 06:57 p. m.
+        r'(\d{2})\/(\d{2})\/(\d{4})\s-\s(\d{1,2}:\d{2})(:\d{2})?\s([APap]\.?[Mm]\.?)',  #10/12/2023 - 8:56 PM
+        r'(\d{4})-(\d{2})-(\d{2})(?:\s(\d{2}:\d{2}:\d{2}))?',  #2023-01-26 10:13:49
+        r'(\d{1,2})/(\d{1,2})/(\d{4})(?:\s-?\s?(\d{2}:\d{2}:\d{2}))?', #28/2/2024 - 21:56:10
+        r'(\d{1,2}) de (\w+) de (\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?([APap]\.?[Mm]\.?)?)?', #01 de junio de 2024 - 01:54 PM
+        r'\w+,\s?(\d{1,2})\s?(\w+)\s?(\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?(AM|PM|[Aa]\.?\s?[Mm]\.?|[Pp]\.?\s?[Mm]\.?)?)?', #Domingo, 01 Octubre 2023 - 12:20 P. M.
+        r'(\d{1,2}) (\w+) (\d{4})(?:\s-?\s?(\d{1,2}:\d{2})(:\d{2})?\s?([APap]\.?\s?[Mm]\.?)?)?', #25 agosto 2024 - 06:57 p. m.
+        r'(\d{2}) (\w+)\. (\d{4}) - (\d{1,2}:\d{2})(:\d{2})?\s?([APap]\.?[Mm]\.?)'  # 04 Ene. 2025 - 11:52 am
         ]
     
-    def replacement_type0(m): #10/12/2023 - 8:56 PM
-            fecha = f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
-            if m.group(4):
-                hora = m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else '')
-                fecha_hora = f" {convert_to_24_hour(hora)}"
-                return fecha + fecha_hora
-            else:
-                return fecha
+    replacements = [
+        lambda m: f"{m.group(3)}-{m.group(2)}-{m.group(1)} {convert_to_24_hour(m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else ''))}",  # 10/12/2023 - 8:56 PM
+        lambda m: f"{m.group(1)}-{m.group(2)}-{m.group(3)} {m.group(4) or '00:00:00'}",  # 2023-01-26 10:13:49
+        lambda m: f"{m.group(3)}-{m.group(2).zfill(2)}-{m.group(1).zfill(2)} {m.group(4) or '00:00:00'}",  # 28/2/2024 - 21:56:10
+        lambda m: f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)} {convert_to_24_hour(m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else ''))}",  # 01 de junio de 2024 - 01:54 PM
+        lambda m: f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)} {convert_to_24_hour(m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else ''))}",  # Domingo, 01 Octubre 2023 - 12:20 P. M.
+        lambda m: f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)} {convert_to_24_hour(m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else ''))}",  # 25 agosto 2024 - 06:57 p. m.
+        lambda m: f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)} {convert_to_24_hour(m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else ''))}"  # 04 Ene. 2025 - 11:52 am
+    ]
 
-    def replacement_type1(m): #2023-01-26 10:13:49
-            fecha = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-            if m.group(4):
-                hora = m.group(4)
-                return fecha +" "+ hora
-            else:
-                return fecha
-
-    def replacement_type2(m): #28/2/2024 - 21:56:10
-            fecha = f"{m.group(3)}-{m.group(2).zfill(2)}-{m.group(1).zfill(2)}"
-            if m.group(4):
-                hora = m.group(4)
-                return fecha +" "+ hora
-            else:
-                return fecha
-
-    def replacement_type3(m): #01 de junio de 2024 - 01:54 PM
-            # print(f"m.group(6): {m.group(6)}")
-            fecha = f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)}"
-            if m.group(4):
-                hora = m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else '')
-                fecha_hora = f" {convert_to_24_hour(hora)}"
-                return fecha + fecha_hora
-            else:
-                return fecha
-
-    def replacement_type4(m): #Domingo, 01 Octubre 2023 - 12:20 P. M.
-            fecha = f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)}"
-            if m.group(4):
-                hora = m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else '')
-                fecha_hora = f" {convert_to_24_hour(hora)}"
-                return fecha + fecha_hora
-            else:
-                return fecha
-            
-    def replacement_type5(m): #25 agosto 2024 - 06:57 p. m.
-            # print(f"m.group(6): {m.group(6)}")
-            fecha = f"{m.group(3)}-{meses[m.group(2).lower()]}-{m.group(1).zfill(2)}"
-            if m.group(4):
-                hora = m.group(4) + (m.group(5) or ':00') + (' ' + m.group(6).replace('.', '').replace(' ', '').upper() if m.group(6) else '')
-                fecha_hora = f" {convert_to_24_hour(hora)}"
-                return fecha + fecha_hora
-            else:
-                return fecha
-
-    replacements = [replacement_type0, replacement_type1, replacement_type2, replacement_type3, replacement_type4, replacement_type5]
-    
-    
     for i, patron in enumerate(regex):
         match = re.search(patron, fecha_hora)
         if match:
             return replacements[i](match)
     
-    return fecha_hora  # Si no coincide con ningún patrón, devolver la fecha original
+    return '2000-01-01 00:00:00'  # Si no coincide con ningún patrón, devolver la fecha original
     
         
 def extract_currency_and_amount(monto):
-    # Eliminar espacios en blanco
+    """
+    Extrae el tipo de moneda y el monto de una cadena con formato específico.
+
+    Formatos soportados:
+    - S/ 1,234.56
+    - $ 123.45
+    - 55.3 (asume S/ como moneda predeterminada)
+
+    Retorna:
+    - Tuple (tipo_moneda, monto) o (None, None) si el formato no coincide.
+    """
+    if not monto:  # Manejo explícito de valores vacíos o nulos
+        return None, None
+    
+    # Convertir a cadena y eliminar espacios
     monto = str(monto).strip()
     
-    # Patrón para detectar el tipo de moneda y el monto
-    patron = re.match(r'(\$|S/)\s?([\d,]+\.\d{2})', monto)
+    # Patrón para detectar tipo de moneda y monto
+    patron = re.match(r'(\$|S\/)?\s?([\d,]+\.\d{1,2})', monto)
     
     if patron:
-        moneda = patron.group(1)
-        cantidad = float(patron.group(2).replace(',', ''))  # Eliminar comas y convertir a float
-        
-        # Devolver el tipo de moneda y el monto como un tuple
+        moneda = patron.group(1) if patron.group(1) else 'S/'  # Moneda predeterminada: S/
+        cantidad = float(patron.group(2).replace(',', ''))
+        # print("imprimiendo moneda y cantidad: " +moneda,cantidad)
         return moneda, cantidad
-    
-    # Si no coincide con el patrón, devolver valores nulos (o manejarlo de otra manera)
+
     return None, None
 
 # Cargar el archivo Excel
-df = pd.read_excel('./app/data/bcp_details.xlsx')
-df2 = pd.read_excel('./app/data/yape_details.xlsx')
+df = pd.read_excel(BCP_FILE)
+df2 = pd.read_excel(YAPE_FILE)
+df3 = pd.read_excel(YAPE_1_FILE)
 
-# Definir los patrones permitidos
+# Definir los patrones permitidos BCP
 patrones_permitidos = [
     "configuracion", 
     "consumo", 
@@ -145,53 +121,63 @@ patrones_permitidos = [
 # Filtrar df por los patrones permitidos
 df = df[df['patron'].isin(patrones_permitidos)]
 
+# print(df.head())
+# print(df2.head())
+# print(df3.head())
+
 # Aplicar la función de normalización a la columna 'fecha_hora'
 df['fecha_hora'] = df['fecha_hora'].apply(normalize_fecha_hora)
 df2['fecha_hora'] = df2['fecha'].apply(normalize_fecha_hora)
+df3['fecha_hora'] = df3['fecha_hora'].apply(normalize_fecha_hora)
 
 # Crear nuevas columnas para el tipo de moneda y el monto
 df['tipo_moneda'], df['monto'] = zip(*df['monto_total'].apply(extract_currency_and_amount))
-df2['tipo_moneda'] = 'S/'
+df2['tipo_moneda'], df2['monto'] = zip(*df2['monto'].apply(extract_currency_and_amount))
+df3['tipo_moneda'], df3['monto'] = zip(*df3['monto_total'].apply(extract_currency_and_amount))
 
 # Asignar el valor 'yape' a una nueva columna 'tipo_operacion' en df2
 df2['tipo_operacion'] = 'yape'
+df3['tipo_operacion'] = 'yape_servicios'
 
-# Crear diccionarios de mapeo para uniformar nombres de columnas
-mapeo_df = {
-    'ID': 'id',
-    'numero_operacion': 'nro_operacion',
-    'tipo_operacion': 'tipo_operacion',
-    'empresa': 'entidad',
-    'origen_ultimos_digitos': 'nro_tarjeta',
-    'compras_internet': 'compras_internet',
-    'compras_extranjero': 'compras_extranjero',
-    'dispocision_efectivo': 'dispocision_efectivo'
-}
+# Crear la columna 'entidad' en df usando 'destino_nombre_titular' solo para los de 'tipo_operacion' igual a 'Constancia de transferencia a terceros' o 'Transferencia a terceros BCP'
+df['entidad'] = df.apply(lambda row: row['destino_nombre_titular'] if row['tipo_operacion'] in ['Constancia de transferencia a terceros', 'Transferencia a terceros BCP', 'Transferencia a otros bancos', 'Transferencia a otro banco', 'Pago de tarjeta a tercero BCP', 'Pago de tarjeta propia BCP'] else row['empresa'], axis=1)
 
-mapeo_df2 = {
-    'id': 'id',
-    'operacion': 'nro_operacion',
-    'beneficiario': 'entidad',
-    'monto': 'monto',
-}
+# Crear la nueva columna 'entidad' combinando 'empresa' y 'servicio'
+df3['entidad'] = df3.apply(lambda row: f"{row['empresa']}, {row['servicio']}" if pd.notnull(row['empresa']) and pd.notnull(row['servicio']) else row['empresa'] or row['servicio'], axis=1)
 
-# Renombrar columnas según el mapeo
-df.rename(columns=mapeo_df, inplace=True)
-df2.rename(columns=mapeo_df2, inplace=True)
 
+# Crear un DataFrame base con las columnas necesarias
 columnas_necesarias = [
     'id', 'nro_operacion', 'tipo_operacion', 'entidad', 'monto',
     'tipo_moneda', 'nro_tarjeta', 'compras_internet', 
     'compras_extranjero', 'dispocision_efectivo', 'fecha_hora'
 ]
-for col in columnas_necesarias:
-    if col not in df.columns:
-        df[col] = None
-    if col not in df2.columns:
-        df2[col] = None
-        
+
+# Seleccionar y renombrar columnas para cada DataFrame
+df = df[['ID', 'numero_operacion', 'entidad', 'tipo_operacion', 'empresa', 'monto', 'tipo_moneda', 'origen_ultimos_digitos', 'compras_internet', 'compras_extranjero', 'dispocision_efectivo', 'fecha_hora']].rename(columns={
+    'ID': 'id',
+    'numero_operacion': 'nro_operacion',
+    'origen_ultimos_digitos': 'nro_tarjeta'
+})
+
+df2 = df2[['id', 'operacion', 'beneficiario', 'monto', 'tipo_moneda', 'fecha_hora', 'tipo_operacion']].rename(columns={
+    'operacion': 'nro_operacion',
+    'beneficiario': 'entidad'
+})
+
+df3 = df3[['id', 'operacion_yape', 'monto', 'tipo_moneda', 'empresa', 'fecha_hora', 'tipo_operacion', 'entidad']].rename(columns={
+    'operacion_yape': 'nro_operacion'
+})
+
+# Asegurar que todas las columnas necesarias están presentes
+for df_tmp in [df, df2, df3]:
+    for col in columnas_necesarias:
+        if col not in df_tmp.columns:
+            df_tmp[col] = None
+
+
 # Concatenar los DataFrames
-df_combinado = pd.concat([df, df2], ignore_index=True)
+df_combinado = pd.concat([df, df2, df3], ignore_index=True)
 
 # Eliminar columnas completamente vacías
 df_combinado = df_combinado.dropna(axis=1, how='all')
@@ -221,6 +207,10 @@ def es_similar(nro_actual, nro_visto):
 
 # Procesar los registros y quedarse con el más reciente en caso de duplicados
 for _, fila in df_combinado_filtrado.iterrows():
+    # Excluir registros con fecha "2000-01-01 00:00:00"
+    if fila['fecha_hora'] == pd.Timestamp('2000-01-01 00:00:00'):
+        continue
+
     nro_operacion_actual = fila['nro_operacion']
     if nro_operacion_actual in registros_unicos:
         # Comparar fechas y quedarse con el registro más reciente
